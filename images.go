@@ -11,6 +11,8 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+
+	"github.com/james226/dockerclient/options"
 )
 
 type Image struct {
@@ -32,32 +34,30 @@ func (i ImageOperations) Pull(ctx context.Context, name string) (*Image, error) 
 	return &Image{name}, err
 }
 
-func (i ImageOperations) Build(ctx context.Context, name string, path string) (*Image, error) {
+func (i ImageOperations) Build(ctx context.Context, name string, path string, opts ...*options.BuildImageOptions) (*Image, error) {
 	buf := new(bytes.Buffer)
 	tw := tar.NewWriter(buf)
 	defer tw.Close()
-
+	opt := options.BuildImage()
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
 	CopyAllFiles(path, "", tw)
-
 	dockerFileTarReader := bytes.NewReader(buf.Bytes())
-
 	build, err := i.cli.ImageBuild(ctx, dockerFileTarReader, types.ImageBuildOptions{
 		Context:    dockerFileTarReader,
-		Dockerfile: "Dockerfile",
+		Dockerfile: opt.Dockerfile(),
 		Tags:       []string{name},
 		Remove:     true})
 	if err != nil {
 		return nil, err
 	}
-
 	defer build.Body.Close()
 	_, err = io.Copy(os.Stdout, build.Body)
-
 	if err != nil {
 		return nil, err
 	}
-
-	return &Image{name}, nil
+	return &Image{Name: name}, nil
 }
 
 func CopyAllFiles(path string, relativePath string, tw *tar.Writer) {
