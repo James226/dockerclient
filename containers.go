@@ -42,8 +42,10 @@ func mapEnv(m map[string]string) []string {
 
 func (c ContainerOperations) Start(ctx context.Context, opt StartContainerOptions) (*Container, error) {
 	err := removeContainer(ctx, c.cli, opt.Name, false)
+	if err != nil {
+		return nil, err
+	}
 	portValue := nat.Port(fmt.Sprintf("%d/tcp", opt.Port))
-
 	resp, err := c.cli.ContainerCreate(ctx, &container.Config{
 		Image:    opt.Image.Name,
 		Hostname: opt.Name,
@@ -80,7 +82,7 @@ func (c *Container) Stop(ctx context.Context, logOutput bool) error {
 }
 
 func stopContainer(ctx context.Context, cli *client.Client, containerId string, logOutput bool) error {
-	err := cli.ContainerStop(ctx, containerId, nil)
+	err := cli.ContainerStop(ctx, containerId, container.StopOptions{})
 	if err != nil {
 		return err
 	}
