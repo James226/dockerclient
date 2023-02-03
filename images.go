@@ -44,11 +44,17 @@ func (i ImageOperations) Build(ctx context.Context, name string, path string, op
 	}
 	CopyAllFiles(path, "", tw)
 	dockerFileTarReader := bytes.NewReader(buf.Bytes())
-	build, err := i.cli.ImageBuild(ctx, dockerFileTarReader, types.ImageBuildOptions{
+	buildOptions := types.ImageBuildOptions{
 		Context:    dockerFileTarReader,
 		Dockerfile: opt.Dockerfile(),
 		Tags:       []string{name},
-		Remove:     true})
+		Remove:     true,
+	}
+	platform, ok := opt.Platform()
+	if ok {
+		buildOptions.Platform = platform
+	}
+	build, err := i.cli.ImageBuild(ctx, dockerFileTarReader, buildOptions)
 	if err != nil {
 		return nil, err
 	}
