@@ -32,7 +32,7 @@ func (c ContainerOperations) Start(ctx context.Context, image *Image, net *Netwo
 	name, hasName := opt.Name()
 	if hasName {
 		err := removeContainer(ctx, c.cli, name, false)
-		if err != nil {
+		if err != nil && !client.IsErrNotFound(err) {
 			return nil, err
 		}
 	} else {
