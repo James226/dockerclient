@@ -32,7 +32,7 @@ func TestBuildImageDockerfile_WithoutSpecifyingDockerfile_ReturnsDefault(t *test
 }
 
 func TestAsLinuxAmd64_WhenCalled_SetsPlatform(t *testing.T) {
-	opt := AsLinuxAmd64()
+	opt := BuildImage().AsLinuxAmd64()
 
 	v, ok := opt.Platform()
 	assert.Equal(t, "linux/amd64", v)
