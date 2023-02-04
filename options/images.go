@@ -47,9 +47,3 @@ func (opt *BuildImageOptions) Platform() (string, bool) {
 func WithDockerfile(dockerfile string) *BuildImageOptions {
 	return BuildImage().WithDockerfile(dockerfile)
 }
-
-// AsLinuxAmd64 returns a new instance of BuildImageOptions with the platform
-// specified as linux/amd64.
-func AsLinuxAmd64() *BuildImageOptions {
-	return BuildImage().AsLinuxAmd64()
-}

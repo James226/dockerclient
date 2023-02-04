@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/docker/go-connections/nat"
+
+	"github.com/james226/dockerclient/options"
 )
 
 type Container struct {
@@ -24,57 +24,49 @@ type ContainerOperations struct {
 	cli *client.Client
 }
 
-type StartContainerOptions struct {
-	Name        string
-	Image       *Image
-	Port        uint16
-	Network     *Network
-	Environment map[string]string
-}
-
-func mapEnv(m map[string]string) []string {
-	var env []string
-	for k, v := range m {
-		env = append(env, fmt.Sprintf("%s=%s", k, v))
+func (c ContainerOperations) Start(ctx context.Context, image *Image, net *Network, opts ...*options.StartContainerOptions) (*Container, error) {
+	opt := options.StartContainer()
+	if len(opts) > 0 {
+		opt = opts[0]
 	}
-	return env
-}
-
-func (c ContainerOperations) Start(ctx context.Context, opt StartContainerOptions) (*Container, error) {
-	err := removeContainer(ctx, c.cli, opt.Name, false)
+	name, hasName := opt.Name()
+	if hasName {
+		err := removeContainer(ctx, c.cli, name, false)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		name = image.Name
+	}
+	portSet, portBindings, err := opt.Ports()
 	if err != nil {
 		return nil, err
 	}
-	portValue := nat.Port(fmt.Sprintf("%d/tcp", opt.Port))
+	hostConfig := &container.HostConfig{
+		PortBindings: portBindings,
+	}
+	if net != nil {
+		hostConfig.NetworkMode = container.NetworkMode(net.ID)
+	}
 	resp, err := c.cli.ContainerCreate(ctx, &container.Config{
-		Image:    opt.Image.Name,
-		Hostname: opt.Name,
-		ExposedPorts: nat.PortSet{
-			portValue: struct{}{},
-		},
-		Env: mapEnv(opt.Environment),
-		Tty: false,
-	}, &container.HostConfig{
-		NetworkMode: container.NetworkMode(opt.Network.ID),
-		PortBindings: nat.PortMap{
-			portValue: []nat.PortBinding{
-				{
-					HostIP:   "0.0.0.0",
-					HostPort: strconv.Itoa(int(opt.Port)),
-				},
-			},
-		},
-	}, nil, nil, opt.Name)
+		Image:        image.Name,
+		Hostname:     name,
+		ExposedPorts: portSet,
+		Env:          opt.EnvironmentVariables(),
+		Tty:          false,
+	}, hostConfig, nil, nil, name)
 	if err != nil {
 		return nil, err
 	}
-
-	if err := c.cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	err = c.cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{})
+	if err != nil {
 		return nil, err
 	}
 	containerId := resp.ID
-
-	return &Container{ID: containerId, cli: c.cli}, nil
+	return &Container{
+		ID:  containerId,
+		cli: c.cli,
+	}, nil
 }
 
 func (c *Container) Stop(ctx context.Context, logOutput bool) error {
