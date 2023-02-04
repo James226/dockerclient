@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/james226/dockerclient/options"
 )
@@ -48,13 +50,22 @@ func (c ContainerOperations) Start(ctx context.Context, image *Image, net *Netwo
 	if net != nil {
 		hostConfig.NetworkMode = container.NetworkMode(net.ID)
 	}
+	dockerPlatform := (*v1.Platform)(nil)
+	platform, hasPlatform := opt.Platform()
+	if hasPlatform {
+		parts := strings.Split(platform, "/")
+		dockerPlatform = &v1.Platform{
+			OS:           parts[0],
+			Architecture: parts[1],
+		}
+	}
 	resp, err := c.cli.ContainerCreate(ctx, &container.Config{
 		Image:        image.Name,
 		Hostname:     name,
 		ExposedPorts: portSet,
 		Env:          opt.EnvironmentVariables(),
 		Tty:          false,
-	}, hostConfig, nil, nil, name)
+	}, hostConfig, nil, dockerPlatform, name)
 	if err != nil {
 		return nil, err
 	}
