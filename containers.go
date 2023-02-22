@@ -46,6 +46,7 @@ func (c ContainerOperations) Start(ctx context.Context, image *Image, net *Netwo
 	}
 	hostConfig := &container.HostConfig{
 		PortBindings: portBindings,
+		AutoRemove:   true,
 	}
 	if net != nil {
 		hostConfig.NetworkMode = container.NetworkMode(net.ID)
@@ -143,7 +144,9 @@ func removeContainer(ctx context.Context, cli *client.Client, container string, 
 		return err
 	}
 
-	err = cli.ContainerRemove(ctx, containerId, types.ContainerRemoveOptions{})
+	err = cli.ContainerRemove(ctx, containerId, types.ContainerRemoveOptions{
+		RemoveVolumes: true,
+	})
 	if err != nil {
 		return err
 	}
