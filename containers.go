@@ -86,11 +86,19 @@ func (c *Container) Stop(ctx context.Context, logOutput bool) error {
 }
 
 func stopContainer(ctx context.Context, cli *client.Client, containerId string, logOutput bool) error {
+	// Take logs before the container is stopped as the logs are
+	// lost at that point, due to auto removal.
+	if logOutput {
+		out, err := cli.ContainerLogs(ctx, containerId, types.ContainerLogsOptions{ShowStdout: true})
+		if err != nil {
+			log.Print(err)
+		}
+		stdcopy.StdCopy(os.Stdout, os.Stderr, out)
+	}
 	err := cli.ContainerStop(ctx, containerId, container.StopOptions{})
 	if err != nil {
 		return err
 	}
-
 	statusCh, errCh := cli.ContainerWait(ctx, containerId, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
@@ -99,16 +107,6 @@ func stopContainer(ctx context.Context, cli *client.Client, containerId string, 
 		}
 	case <-statusCh:
 	}
-
-	if logOutput {
-		out, err := cli.ContainerLogs(ctx, containerId, types.ContainerLogsOptions{ShowStdout: true})
-		if err != nil {
-			log.Print(err)
-		}
-
-		stdcopy.StdCopy(os.Stdout, os.Stderr, out)
-	}
-
 	return nil
 }
 
