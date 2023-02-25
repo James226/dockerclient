@@ -4,8 +4,8 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -38,14 +38,17 @@ func (i ImageOperations) Build(ctx context.Context, name string, path string, op
 	buf := new(bytes.Buffer)
 	tw := tar.NewWriter(buf)
 	defer tw.Close()
+	err := loadBuildContext(path, "", tw)
+	if err != nil {
+		return nil, err
+	}
+	contextReader := bytes.NewReader(buf.Bytes())
 	opt := options.BuildImage()
 	if len(opts) > 0 {
 		opt = opts[0]
 	}
-	CopyAllFiles(path, "", tw)
-	dockerFileTarReader := bytes.NewReader(buf.Bytes())
 	buildOptions := types.ImageBuildOptions{
-		Context:    dockerFileTarReader,
+		Context:    bytes.NewReader(buf.Bytes()),
 		Dockerfile: opt.Dockerfile(),
 		Tags:       []string{name},
 		Remove:     true,
@@ -54,7 +57,7 @@ func (i ImageOperations) Build(ctx context.Context, name string, path string, op
 	if ok {
 		buildOptions.Platform = platform
 	}
-	build, err := i.cli.ImageBuild(ctx, dockerFileTarReader, buildOptions)
+	build, err := i.cli.ImageBuild(ctx, contextReader, buildOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -66,33 +69,45 @@ func (i ImageOperations) Build(ctx context.Context, name string, path string, op
 	return &Image{Name: name}, nil
 }
 
-func CopyAllFiles(path string, relativePath string, tw *tar.Writer) {
-	items, _ := os.ReadDir(path)
-	for _, item := range items {
-		if item.IsDir() {
-			CopyAllFiles(filepath.Join(path, item.Name()), filepath.Join(relativePath, item.Name()), tw)
-		} else {
-			fileReader, err := os.Open(filepath.Join(path, item.Name()))
+// Used to recursively load files from the specified path a .tar file.
+func loadBuildContext(path, relativePath string, tw *tar.Writer) error {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return fmt.Errorf("failed to read dir: %v", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			err = loadBuildContext(filepath.Join(path, entry.Name()), filepath.Join(relativePath, entry.Name()), tw)
 			if err != nil {
-				log.Fatal(err, " :unable to open file")
+				return err
 			}
-			fileBytes, err := io.ReadAll(fileReader)
-			if err != nil {
-				log.Fatal(err, " :unable to read file")
-			}
-
-			tarHeader := &tar.Header{
-				Name: relativePath + "/" + item.Name(),
-				Size: int64(len(fileBytes)),
-			}
-			err = tw.WriteHeader(tarHeader)
-			if err != nil {
-				log.Fatal(err, " :unable to write tar header")
-			}
-			_, err = tw.Write(fileBytes)
-			if err != nil {
-				log.Fatal(err, " :unable to write tar body")
-			}
+			continue
+		}
+		filename := filepath.Join(path, entry.Name())
+		rdr, err := os.Open(filename)
+		if err != nil {
+			return fmt.Errorf("failed to open %s: %v", filename, err)
+		}
+		defer rdr.Close()
+		data, err := io.ReadAll(rdr)
+		if err != nil {
+			return fmt.Errorf("failed to read %s: %v", filename, err)
+		}
+		// Use ToSlash to make the filepath generic. This solves the issue where
+		// Windows uses backslashes and Docker uses forward slashs.
+		name := filepath.ToSlash(filepath.Join(relativePath, entry.Name()))
+		header := &tar.Header{
+			Name: name,
+			Size: int64(len(data)),
+		}
+		err = tw.WriteHeader(header)
+		if err != nil {
+			return fmt.Errorf("failed to write tar header for %s: %v", name, err)
+		}
+		_, err = tw.Write(data)
+		if err != nil {
+			return fmt.Errorf("failed to write tar body for %s: %v", name, err)
 		}
 	}
+	return nil
 }
