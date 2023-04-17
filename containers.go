@@ -86,16 +86,20 @@ func (c *Container) Stop(ctx context.Context, logOutput bool) error {
 }
 
 func stopContainer(ctx context.Context, cli *client.Client, containerId string, logOutput bool) error {
+	data, err := cli.ContainerInspect(ctx, containerId)
+	if client.IsErrNotFound(err) || data.State.Status == "removing" {
+		return nil
+	}
 	// Take logs before the container is stopped as the logs are
 	// lost at that point, due to auto removal.
-	if logOutput {
+	if logOutput && data.State.Running {
 		out, err := cli.ContainerLogs(ctx, containerId, types.ContainerLogsOptions{ShowStdout: true})
 		if err != nil {
 			log.Print(err)
 		}
 		stdcopy.StdCopy(os.Stdout, os.Stderr, out)
 	}
-	err := cli.ContainerStop(ctx, containerId, container.StopOptions{})
+	err = cli.ContainerStop(ctx, containerId, container.StopOptions{})
 	if err != nil {
 		return err
 	}
