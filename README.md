@@ -72,3 +72,5 @@ func main() {
 	wg.Wait()
 }
 ```
+
+You can find more examples of how to use this package in the [examples](./examples) directory.
