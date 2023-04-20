@@ -47,6 +47,7 @@ func (c ContainerOperations) Start(ctx context.Context, image *Image, net *Netwo
 	hostConfig := &container.HostConfig{
 		PortBindings: portBindings,
 		AutoRemove:   true,
+		CapAdd:       opt.CapAdd(),
 	}
 	if net != nil {
 		hostConfig.NetworkMode = container.NetworkMode(net.ID)
