@@ -82,6 +82,11 @@ func TestWithEnvironmentVariables_GivenValues_SetsEnvVars(t *testing.T) {
 	assert.Equal(t, v, value)
 }
 
+func TestWithCapAdd_GivenValues_SetsValues(t *testing.T) {
+	opt := WithCapAdd("SYS_PTRACE")
+	assert.Equal(t, []string{"SYS_PTRACE"}, opt.capAdd)
+}
+
 func TestStartContainerAsLinuxAmd64_WhenCalled_SetsPlatform(t *testing.T) {
 	opt := StartContainer().AsLinuxAmd64()
 
@@ -136,4 +141,23 @@ func TestStartContainerPlatform_WhenSet_ReturnsConfiguredPlatform(t *testing.T) 
 	v, ok := opt.Platform()
 	assert.Equal(t, platform, v)
 	assert.True(t, ok)
+}
+
+func TestStartContainerCapAdd_WhereSet_ReturnsValues(t *testing.T) {
+	opt := &StartContainerOptions{
+		capAdd: []string{"1"},
+	}
+
+	caps := opt.CapAdd()
+	assert.Equal(t, []string{"1"}, caps)
+}
+
+func TestStartContainerCapAdd_WhereNotSet_ReturnsValues(t *testing.T) {
+	opt := &StartContainerOptions{
+		capAdd: nil,
+	}
+
+	caps := opt.CapAdd()
+	assert.NotNil(t, caps)
+	assert.Len(t, caps, 0)
 }
