@@ -12,6 +12,7 @@ type StartContainerOptions struct {
 	ports       map[uint16]string
 	environment map[string]string
 	platform    *string
+	capAdd      []string
 }
 
 // StartContainer returns a new instance of StartContainerOptions.
@@ -60,6 +61,14 @@ func (opt *StartContainerOptions) Platform() (string, bool) {
 	return *opt.platform, true
 }
 
+// CapAdd returns the additionally configured UNIX capabilities.
+func (opt *StartContainerOptions) CapAdd() []string {
+	if opt.capAdd == nil {
+		return []string{}
+	}
+	return opt.capAdd
+}
+
 // WithName is used to configure the name of the container to start.
 func (opt *StartContainerOptions) WithName(name string) *StartContainerOptions {
 	opt.name = &name
@@ -99,6 +108,12 @@ func (opt *StartContainerOptions) AsLinuxAmd64() *StartContainerOptions {
 	return opt
 }
 
+// WithCapAdd is used to configure extra UNIX capabilities for the container.
+func (opt *StartContainerOptions) WithCapAdd(c ...string) *StartContainerOptions {
+	opt.capAdd = append(opt.capAdd, c...)
+	return opt
+}
+
 // WithName is used to configure the name of the container to start.
 func WithName(name string) *StartContainerOptions {
 	return StartContainer().WithName(name)
@@ -123,4 +138,9 @@ func WithEnvironmentVariable(name, value string) *StartContainerOptions {
 // WithEnvironmentVariables is used to configure a collection of environment variables.
 func WithEnvironmentVariables(values map[string]string) *StartContainerOptions {
 	return StartContainer().WithEnvironmentVariables(values)
+}
+
+// WithCapAdd is used to configure extra UNIX capabilities for the container.
+func WithCapAdd(c ...string) *StartContainerOptions {
+	return StartContainer().WithCapAdd(c...)
 }
