@@ -4,10 +4,12 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -62,7 +64,7 @@ func (i ImageOperations) Build(ctx context.Context, name string, path string, op
 		return nil, err
 	}
 	defer build.Body.Close()
-	_, err = io.Copy(os.Stdout, build.Body)
+	err = logBuildOutput(build.Body, name)
 	if err != nil {
 		return nil, err
 	}
@@ -107,6 +109,27 @@ func loadBuildContext(path, relativePath string, tw *tar.Writer) error {
 		_, err = tw.Write(data)
 		if err != nil {
 			return fmt.Errorf("failed to write tar body for %s: %v", name, err)
+		}
+	}
+	return nil
+}
+
+func logBuildOutput(r io.Reader, name string) error {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return fmt.Errorf("failed to read image build output: %v", err)
+	}
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		fmt.Printf("[%s]: %s\n", name, line)
+		var errorData map[string]interface{}
+		err = json.Unmarshal([]byte(line), &errorData)
+		if err == nil {
+			message, ok := errorData["error"]
+			if ok {
+				fmt.Printf("[%s]: failed to build image: %s\n", name, message)
+				return fmt.Errorf("failed to build image: %s", message)
+			}
 		}
 	}
 	return nil
