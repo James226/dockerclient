@@ -3,7 +3,7 @@ package dockerclient
 import (
 	"context"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 )
 
@@ -16,18 +16,17 @@ type NetworkOperations struct {
 }
 
 func (n NetworkOperations) Create(ctx context.Context, name string) (*Network, error) {
-	network, err := getNetwork(ctx, n.cli, name)
+	net, err := getNetwork(ctx, n.cli, name)
 	if err != nil {
 		return nil, err
 	}
 
-	if network != nil {
-		return network, nil
+	if net != nil {
+		return net, nil
 	}
 
-	newNetwork, err := n.cli.NetworkCreate(ctx, name, types.NetworkCreate{
-		Attachable:     true,
-		CheckDuplicate: true,
+	newNetwork, err := n.cli.NetworkCreate(ctx, name, network.CreateOptions{
+		Attachable: true,
 	})
 	if err != nil {
 		panic(err)
@@ -37,7 +36,7 @@ func (n NetworkOperations) Create(ctx context.Context, name string) (*Network, e
 }
 
 func getNetwork(ctx context.Context, cli *client.Client, name string) (*Network, error) {
-	networks, err := cli.NetworkList(ctx, types.NetworkListOptions{})
+	networks, err := cli.NetworkList(ctx, network.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

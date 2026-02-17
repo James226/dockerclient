@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -70,7 +69,7 @@ func (c ContainerOperations) Start(ctx context.Context, image *Image, net *Netwo
 	if err != nil {
 		return nil, err
 	}
-	err = c.cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{})
+	err = c.cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -88,13 +87,13 @@ func (c *Container) Stop(ctx context.Context, logOutput bool) error {
 
 func stopContainer(ctx context.Context, cli *client.Client, containerID, containerName string, logOutput bool) error {
 	data, err := cli.ContainerInspect(ctx, containerID)
-	if client.IsErrNotFound(err) || data.State.Status == "removing" {
+	if client.IsErrNotFound(err) || (err == nil && data.State.Status == "removing") {
 		return nil
 	}
 	// Take logs before the container is stopped as the logs are
 	// lost at that point, due to auto removal.
 	if logOutput && data.State.Running {
-		out, err := cli.ContainerLogs(ctx, containerID, types.ContainerLogsOptions{ShowStdout: true})
+		out, err := cli.ContainerLogs(ctx, containerID, container.LogsOptions{ShowStdout: true})
 		if err != nil {
 			fmt.Printf("Failed to get logs for container '%s': %v\n", containerName, err)
 		}
@@ -117,7 +116,7 @@ func stopContainer(ctx context.Context, cli *client.Client, containerID, contain
 }
 
 func getContainerId(ctx context.Context, cli *client.Client, containerName string) (string, error) {
-	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{
+	containers, err := cli.ContainerList(ctx, container.ListOptions{
 		All: true,
 	})
 	if err != nil {
@@ -139,11 +138,14 @@ func removeContainer(ctx context.Context, cli *client.Client, containerName stri
 	if err != nil {
 		return err
 	}
+	if containerId == "" {
+		return nil
+	}
 	err = stopContainer(ctx, cli, containerId, containerName, logOutput)
 	if err != nil {
 		return err
 	}
-	err = cli.ContainerRemove(ctx, containerId, types.ContainerRemoveOptions{
+	err = cli.ContainerRemove(ctx, containerId, container.RemoveOptions{
 		RemoveVolumes: true,
 	})
 	if err != nil {

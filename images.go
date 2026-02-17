@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 
 	"github.com/james226/dockerclient/options"
@@ -26,7 +27,7 @@ type ImageOperations struct {
 }
 
 func (i ImageOperations) Pull(ctx context.Context, name string) (*Image, error) {
-	reader, err := i.cli.ImagePull(ctx, name, types.ImagePullOptions{})
+	reader, err := i.cli.ImagePull(ctx, name, image.PullOptions{})
 	if err != nil {
 		return nil, err
 	}
